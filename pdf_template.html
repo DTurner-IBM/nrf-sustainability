@@ -1,0 +1,249 @@
+
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+  <style>
+    #pdfviewer {
+        background: #000;
+    }
+    .pdf_wrapper {
+        position: relative;
+        padding-bottom: 56.25%; /* 16:9, for an aspect ratio of 1:1 change to this value to 100% */ 
+    }
+    .pdf_wrapper iframe{
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+    .pdf-next{
+        height:100vh;
+        width:50vw;
+        position:absolute;
+        z-index:10;
+        top:0;
+        left:50%;
+    }
+    .pdf-back{
+        height:100vh;
+        width:50vw;
+        position:absolute;
+        z-index:10;
+        top:0;
+        left:0;
+    }
+    .pdf-back-btn{
+        position:absolute;
+        z-index:20;
+        bottom:0px;
+        left:50vw;
+        margin-left:-49px;
+    }
+    .pdf-next-btn{
+        position:absolute;
+        z-index:21;
+        bottom:0px;
+        left:calc(50vw);
+        margin-left:1px;
+    }
+    .button-carbon-sm:hover{
+    background-color: #42BE65;
+    }
+    .button-carbon-sm:active {
+        background-color: #42BE65;
+    }
+
+    .button-carbon-sm:focus {
+        border-color: #42BE65;
+        -webkit-box-shadow: inset 0 0 0 1px #ffffff;
+        box-shadow: inset 0 0 0 1px #ffffff;
+        -webkit-box-shadow: inset 0 0 0 1px #ffffff;
+        box-shadow: inset 0 0 0 1px #ffffff;
+    }
+    .button-icon{
+        background: #42BE65;
+        height:48px;
+        width:48px;
+    }
+    .button-icon-inv{
+        background: none;
+        height:48px;
+        width:48px;
+    }
+    .button-icon-inv svg{
+        margin:8px;
+        padding:5px;
+    }
+    .button-icon svg{
+        margin:8px;
+        padding:5px;
+    }
+    .pdf_wrapper{
+        background: #000;
+    }
+
+    * { margin:0; padding:0; } /* to remove the top and left whitespace */
+    html, body { width:100%; height:100%; overflow:hidden;        background: #000;} /* just to be sure these are full screen*/
+    canvas { display:block; background: #000;} /* To remove the scrollbars */
+  </style>
+</head>
+<body>
+    <div class="pdf_wrapper">
+<canvas id="pdfviewer"></canvas></div>
+  <div class="pages text-center my-4">
+    <span class="justify-content-end">
+      <div class="pdf-back" id="prev"></div>
+      <div class="pdf-next" id="next"></div>
+      <div class="pdf-back-btn" id="prev-btn">
+        <div class="button-icon button-carbon-sm"><svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 26L15.43 24.607L7.85 17L28 17L28 15L7.85 15L15.43 7.427L14 6L4 16L14 26Z" fill="white"/>
+            </svg>                                                                                                
+        </div>
+      </div>
+      <div class="pdf-next-btn" id="next-btn">
+        <div class="button-icon button-carbon-sm"><svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 6L16.57 7.393L24.15 15H4V17H24.15L16.57 24.573L18 26L28 16L18 6Z" fill="white"/>
+            </svg>                                                                                                
+        </div>
+      </div>
+    </span>
+    <span class="mr-2">Page</span>
+    <span id="currentPage">0</span>
+    <span class="mx-1">/</span>
+    <span id="totalPages">0</span>
+  </div>
+<script src='./js/pdf.min.js'></script>
+<!--<script src="./js/script.js"></script>-->
+</body>
+<script>
+    function getParamValue(paramName)
+    {
+        var url = window.location.search.substring(1); 
+        var qArray = url.split('&'); 
+        for (var i = 0; i < qArray.length; i++) 
+        {
+            var pArr = qArray[i].split('=');
+            if (pArr[0] == paramName){ return pArr[1];}
+        }
+    }
+    var testURL = getParamValue('pdf');
+    const pdfHolder = document.querySelector('#pdfviewer');
+    let pdfLocation = testURL;
+    const url = pdfLocation;
+    
+    const pdfjsLib = window["pdfjs-dist/build/pdf"];
+    pdfjsLib.GlobalWorkerOptions.workerSrc ="./js/pdf.worker.min.js";
+    
+    var pdfDoc = null,
+    pageNum = 1,
+    pageRendering = false,
+    pageNumPending = null,
+    scale = 1,
+    canvas = document.getElementById("pdfviewer"),
+    ctx = canvas.getContext("2d");
+
+  
+    function renderPageOld(num) {
+      pageRendering = true;
+      pdfDoc.getPage(num).then(function (page) {
+        canvas.height = window.innerHeight;
+        canvas.width = window.innerWidth;
+    
+        var viewport = page.getViewport({ scale: scale });
+        canvas.height = scale * viewport.height;
+        canvas.width = scale * viewport.width;
+        canvas.style.height = viewport.height/(scale*scale) +'px'; //showing size will be smaller size
+        canvas.style.width = viewport.width/(scale*scale)+'px';
+        var renderContext = {
+          canvasContext: ctx,
+          viewport: viewport,
+          transform: [scale, 0, 0, scale, 0, 0]
+        };
+
+        var renderTask = page.render(renderContext);
+        renderTask.promise.then(function () {
+          pageRendering = false;
+          if (pageNumPending !== null) {
+            renderPage(pageNumPending);
+            pageNumPending = null;
+          }
+        });
+      });
+      document.getElementById("currentPage").textContent = num;
+    }
+
+    //OLD
+    function renderPage(num) {
+      pageRendering = true;
+      pdfDoc.getPage(num).then(function (page) {
+        canvas.height = window.innerHeight;
+        canvas.width = window.innerWidth;
+    
+        var tempviewport = page.getViewport({ scale: scale, });
+        var scaleNew = canvas.width / tempviewport.viewBox[2];
+        var viewport = page.getViewport({ scale: scale })
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        canvas.style.height = (window.innerHeight) +'px'; //showing size will be smaller size
+        canvas.style.width = (window.innerWidth) +'px';
+        var renderContext = {
+          canvasContext: ctx,
+          viewport: viewport,
+        };
+    
+        var renderTask = page.render(renderContext);
+        renderTask.promise.then(function () {
+          pageRendering = false;
+          if (pageNumPending !== null) {
+            renderPage(pageNumPending);
+            pageNumPending = null;
+          }
+        });
+      });
+      document.getElementById("currentPage").textContent = num;
+    }
+
+
+
+    function queueRenderPage(num) {
+      if (pageRendering) {
+        pageNumPending = num;
+      } else {
+        renderPage(num);
+      }
+    }
+    pdfjsLib.getDocument(url).promise.then(function (pdfDoc_) {
+      pdfDoc = pdfDoc_;
+      document.getElementById("totalPages").textContent = pdfDoc.numPages;
+    
+      // Initial/first page rendering
+      renderPage(pageNum || 1);
+    });
+    function onPrevPage(e) {
+        e. stopPropagation();
+      if (pageNum <= 1) {
+        return;
+      }
+      pageNum--;
+      queueRenderPage(pageNum);
+    }
+    document.getElementById("prev").addEventListener("click", onPrevPage);
+    document.getElementById("prev-btn").addEventListener("click", onPrevPage);
+
+    function onNextPage(e) {
+        e. stopPropagation();
+        if (pageNum >= pdfDoc.numPages) {
+          return;
+        }
+        pageNum++;
+        queueRenderPage(pageNum);
+    
+    }
+    document.getElementById("next").addEventListener("click", onNextPage);
+    document.getElementById("next-btn").addEventListener("click", onNextPage);
+
+    window.addEventListener('resize', ()=>{renderPage(pageNum)});
+    </script>
+</html>
